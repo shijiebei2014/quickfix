@@ -55,7 +55,7 @@ type Acceptor struct {
 type ConnectionValidator interface {
 	// Validate the connection for validity. This can be a part of authentication process.
 	// For example, you may tie up a SenderCompID to an IP range, or to a specific TLS certificate as a part of mTLS.
-	Validate(netConn net.Conn, session SessionID) error
+	Validate(netConn net.Conn, session SessionID) (net.Conn, error)
 }
 
 // Start accepting connections.
@@ -312,9 +312,11 @@ func (a *Acceptor) handleConnection(netConn net.Conn) {
 
 	// We have a session ID and a network connection. This seems to be a good place for any custom authentication logic.
 	if a.connectionValidator != nil {
-		if err := a.connectionValidator.Validate(netConn, sessID); err != nil {
+		if newNetConn, err := a.connectionValidator.Validate(netConn, sessID); err != nil {
 			a.globalLog.OnEventf("Unable to validate a connection for session %v: %v", sessID, err.Error())
 			return
+		} else if newNetConn != nil {
+			netConn = newNetConn
 		}
 	}
 
